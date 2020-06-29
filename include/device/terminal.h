@@ -6,6 +6,7 @@
 #include <chrono>
 
 #include "../device.h"
+#include "../nerve.h"
 
 namespace bot {
 namespace device {
