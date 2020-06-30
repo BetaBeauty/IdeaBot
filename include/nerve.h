@@ -15,6 +15,18 @@
 namespace bot{
 namespace inner {
 
+/**
+ * Global Transition Status
+ *  indicating the life circle of Organ, including Nerve,
+ *  Device and Core etc.
+ **/
+enum Status {
+  INIT,
+  READY,
+  START,
+  DESTORY
+}; 
+
 template<
   template<typename> class DevType,
   typename DType,
@@ -37,13 +49,11 @@ class Dendrite {
 template<typename DType>
 using DdrPtr = std::shared_ptr<Dendrite<DType>>;
 
-enum Status {
-  INIT,
-  READY,
-  START,
-  DESTORY
-}; 
-
+/**
+ * (TODO): Add the distroy logic,
+ *  such as wait for thread to process all the stream information,
+ *  same as the Device.
+ **/
 template<typename DType = std::string>
 class Nerve {
  public:
@@ -52,12 +62,12 @@ class Nerve {
   }
 
   Nerve() : _status(Status::INIT), _ddr(nullptr) {
-    std::thread t(&Nerve::start, this);
-    t.detach();
+    _run_thread = std::thread(&Nerve::start, this);
   }
 
   ~Nerve() {
-    destroy();
+    _status = Status::DESTORY;
+    _cv.notify_all();
   }
 
   Nerve& send(DType val) {
@@ -71,7 +81,7 @@ class Nerve {
 
   void link_dendrite(DdrPtr<DType> ddr) {
     _ddr = ddr;
-    _status.store(Status::READY);
+    _status = Status::READY;
   } 
 
  private:
@@ -94,13 +104,9 @@ class Nerve {
     }
   }
 
-  void destroy() {
-    _status.store(Status::DESTORY);
-    _cv.notify_all();
-  }
-
  private:
-  std::atomic<int> _status;
+  Status _status;
+  std::thread _run_thread;
 
   std::condition_variable _cv;
   std::mutex _mutex;
@@ -121,6 +127,19 @@ class Device {
  public:
   virtual inner::NervePtr<DType>
   link_core(inner::NervePtr<DType>) = 0;
+
+  inner::NervePtr<DType> bind_dentrite() {
+    std::function<void(DType)> f = [this](DType val) {
+      process(val);
+    };
+
+    auto dendrite = inner::Make<inner::Dendrite, DType>(f);
+    auto nerve = inner::Make<inner::Nerve, DType>();
+    nerve->link_dendrite(dendrite);
+    return nerve;
+  }
+
+  virtual void process(DType val) = 0;
 };
 
 template<typename DType>
