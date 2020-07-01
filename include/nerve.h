@@ -8,9 +8,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <thread>
-
-#include "base.h"
-#include "core.h"
+#include <functional>
 
 namespace bot{
 namespace inner {
@@ -57,10 +55,6 @@ using DdrPtr = std::shared_ptr<Dendrite<DType>>;
 template<typename DType = std::string>
 class Nerve {
  public:
-  static std::shared_ptr<Nerve<DType>> Make() {
-    return std::make_shared<Nerve<DType>>();
-  }
-
   Nerve() : _status(Status::INIT), _ddr(nullptr) {
     _run_thread = std::thread(&Nerve::start, this);
   }
@@ -68,6 +62,7 @@ class Nerve {
   ~Nerve() {
     _status = Status::DESTORY;
     _cv.notify_all();
+    if (_run_thread.joinable()) _run_thread.join();
   }
 
   Nerve& send(DType val) {
@@ -101,6 +96,8 @@ class Nerve {
       for (auto & val : bak) {
         if (_ddr) _ddr->call(val);
       }
+
+      lock.lock();
     }
   }
 
@@ -117,38 +114,6 @@ class Nerve {
 
 template<typename DType>
 using NervePtr = std::shared_ptr<Nerve<DType>>;
-
-}
-
-namespace device {
-
-template<typename DType>
-class Device {
- public:
-  virtual inner::NervePtr<DType>
-  link_core(inner::NervePtr<DType>) = 0;
-
-  inner::NervePtr<DType> bind_dentrite() {
-    std::function<void(DType)> f = [this](DType val) {
-      process(val);
-    };
-
-    auto dendrite = inner::Make<inner::Dendrite, DType>(f);
-    auto nerve = inner::Make<inner::Nerve, DType>();
-    nerve->link_dendrite(dendrite);
-    return nerve;
-  }
-
-  virtual void process(DType val) = 0;
-};
-
-template<typename DType>
-using DevPtr = std::shared_ptr<Device<DType>>;
-
-template<typename DevType, typename... Args>
-inline std::shared_ptr<DevType> Make(Args... args) {
-  return std::make_shared<DevType>(args...);
-}
 
 }
 

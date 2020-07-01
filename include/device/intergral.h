@@ -3,6 +3,7 @@
 
 #include <functional>
 
+#include "../device.h"
 #include "../nerve.h"
 
 namespace bot {
@@ -30,47 +31,44 @@ class Display : public Device<std::string> {
   inner::NervePtr<std::string> _back_nerve;
 };
 
-class Terminal : public Device<std::string> {
+class Keyboard : public Device<std::string> {
   using DType = std::string;
  public:
-  Terminal() : interrupt(0) {
+  Keyboard() : _status(inner::Status::INIT) {
     _call_nerve = bind_dentrite();
-    _status = inner::Status::INIT;
-
-    std::thread t(&Terminal::listenInputStream, this);
-    t.detach();
   }
 
   void process(std::string val) override {
-    // Terminal not handle the call method.
-    std::cout << "[Terminal]: ignored " << val << "\n";
+    // Keyboard not handle the call method.
+    std::cout << "[Keyboard]: ignored " << val << "\n";
     std::flush(std::cout);
   }
 
   inner::NervePtr<std::string>
   link_core(inner::NervePtr<std::string> nerve) override {
     if (_status != inner::Status::READY) {
-      _listen_thread[0] = 
-        std::thread(&Terminal::listenInputStream, this);
+      _listen_thread = 
+        std::thread(&Keyboard::listenKeyboard, this);
       _status = inner::Status::READY;
     }
     _back_nerve = nerve;
     return _call_nerve;
   }
 
-  ~Terminal() {
+  ~Keyboard() {
     _status = inner::Status::DESTORY;
-    if (_listen_thread[0].joinable()) {
-      _listen_thread[0].join();
+    if (_listen_thread.joinable()) {
+      _listen_thread.join();
     }
   }
 
  private:
-  void listenInputStream() {
+  void listenKeyboard() {
     static thread_local std::string val;
 
     while (_status != inner::Status::DESTORY) {
       if (std::cin.peek() != EOF) {
+        std::cout << "[wait for input " << std::cin.peek() << "]: ";
         std::cin >> val;
         _back_nerve->send(val);
       } else {
@@ -80,8 +78,7 @@ class Terminal : public Device<std::string> {
   }
 
   inner::Status _status;
-  std::thread _listen_thread[1];
-  std::atomic<int8_t> interrupt;
+  std::thread _listen_thread;
   inner::NervePtr<std::string> _call_nerve;
   inner::NervePtr<std::string> _back_nerve;
 };
