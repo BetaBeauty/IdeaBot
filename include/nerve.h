@@ -10,7 +10,7 @@
 #include <thread>
 #include <functional>
 
-namespace bot{
+namespace bot {
 namespace inner {
 
 /**

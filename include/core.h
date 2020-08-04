@@ -9,6 +9,11 @@
 namespace bot {
 namespace core {
 
+class Soul {
+ public:
+
+};
+
 class Core {
  public:
   Core() {
